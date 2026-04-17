@@ -1,5 +1,6 @@
 import asyncio
 import discord
+from discord import app_commands
 from discord.ext import commands
 import json
 import os
@@ -12,6 +13,54 @@ import aiohttp
 from datetime import datetime, timezone
 from collections import defaultdict
 import functools
+
+# ─────────────────────────────────────────────────────────────
+#  🔴 INTERFAZ ROJA — Consola de inicio
+# ─────────────────────────────────────────────────────────────
+try:
+    import colorama
+    colorama.init(autoreset=True)
+    R  = colorama.Fore.RED
+    BR = colorama.Fore.LIGHTRED_EX
+    W  = colorama.Fore.WHITE
+    BW = colorama.Style.BRIGHT + colorama.Fore.WHITE
+    RS = colorama.Style.RESET_ALL
+    YL = colorama.Fore.YELLOW
+    GR = colorama.Fore.LIGHTBLACK_EX
+    DM = colorama.Style.DIM
+except ImportError:
+    R = BR = W = BW = RS = YL = GR = DM = ""
+
+_BANNER = r"""
+{r}╔══════════════════════════════════════════════════════════════╗
+{r}║                                                              ║
+{b}║   ███████╗██╗  ██╗ █████╗  ██████╗  ██████╗ ███╗   ██╗     ║
+{b}║   ██╔════╝╚██╗██╔╝██╔══██╗██╔════╝ ██╔═══██╗████╗  ██║     ║
+{r}║   █████╗   ╚███╔╝ ███████║██║  ███╗██║   ██║██╔██╗ ██║     ║
+{b}║   ██╔══╝   ██╔██╗ ██╔══██║██║   ██║██║   ██║██║╚████║     ║
+{r}║   ███████╗██╔╝╚██╗██║  ██║╚██████╔╝╚██████╔╝██║ ╚███║     ║
+{b}║   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚══╝     ║
+{r}║                                                              ║
+{r}║           [ by Exagonal  ·  AntiNuke v2.0 ]                 ║
+{r}╚══════════════════════════════════════════════════════════════╝
+""".format(r=R, b=BR)
+
+def mostrar_banner(bot_user=None, guild_count=0):
+    print(_BANNER)
+    sep = f"{R}{'═' * 64}{RS}"
+    print(sep)
+    if bot_user:
+        tag = f"{bot_user.name}#{bot_user.discriminator}" if bot_user.discriminator != "0" else bot_user.name
+        print(f"  {BW}Bot     {RS}: {BR}{tag}{RS}  {GR}(ID: {bot_user.id}){RS}")
+    print(f"  {BW}Prefijo {RS}: {BR}!comando{RS}  {GR}·{RS}  {BR}/comando{RS}")
+    print(f"  {BW}Servers {RS}: {BR}{guild_count}{RS} servidor(es)")
+    print(f"  {BW}Módulos {RS}: {BR}AntiNuke · Mod · Juegos · Anime · Fun · Roleplay{RS}")
+    print(f"  {BW}Status  {RS}: {R}●{RS} {BR}Online{RS}")
+    print(sep)
+    print(f"  {YL}✔ Prefix commands ( ! ) listos{RS}")
+    print(f"  {YL}✔ Slash commands  ( / ) sincronizados{RS}")
+    print(sep)
+    print()
 
 # ─────────────────────────────────────────────────────────────
 #  LOGGING
@@ -82,7 +131,11 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+def _get_prefix(bot_instance, message):
+    """Responde a ! (configurado), / y mención."""
+    return commands.when_mentioned_or(PREFIX, "/")(bot_instance, message)
+
+bot = commands.Bot(command_prefix=_get_prefix, intents=intents)
 bot.remove_command("help")
 
 # ─────────────────────────────────────────────────────────────
@@ -282,7 +335,7 @@ async def on_member_ban(guild: discord.Guild, user: discord.User):
             await guild.unban(user, reason=f"[AntiNuke] Ban no autorizado por {autor}")
             await log_antinuke(guild, "♻️ Ban Revertido",
                 f"**Víctima:** {user.mention} (`{user.id}`)\n**Baneado por:** {autor.mention}\n**Acción:** Desbaneado automáticamente",
-                color=0x00FF88)
+                color=0xFF0000)
         except Exception as e:
             log.error(f"[AntiNuke] No pude desbanear a {user}: {e}")
 
@@ -369,7 +422,7 @@ async def on_guild_role_delete(role: discord.Role):
                 pass
             await log_antinuke(role.guild, "♻️ Rol Restaurado",
                 f"**Rol:** `{role.name}`\n**Eliminado por:** {autor.mention}\n**Restaurado:** {nuevo_rol.mention}",
-                color=0x00FF88)
+                color=0xFF0000)
         except Exception as e:
             log.error(f"[AntiNuke] No pude restaurar rol {role.name}: {e}")
 
@@ -401,7 +454,7 @@ async def on_guild_role_create(role: discord.Role):
             await role.delete(reason=f"[AntiNuke] Rol no autorizado creado por {autor}")
             await log_antinuke(role.guild, "🗑️ Rol No Autorizado Eliminado",
                 f"**Rol:** `{role.name}`\n**Creado por:** {autor.mention}\n**Acción:** Eliminado automáticamente",
-                color=0xFF8800)
+                color=0xFF0000)
         except Exception as e:
             log.error(f"[AntiNuke] No pude eliminar rol {role.name}: {e}")
 
@@ -473,7 +526,7 @@ async def on_guild_channel_delete(channel):
                 pass
             await log_antinuke(channel.guild, "♻️ Canal Restaurado",
                 f"**Canal:** `#{channel.name}`\n**Eliminado por:** {autor.mention}\n**Restaurado:** {nuevo_canal.mention}",
-                color=0x00FF88)
+                color=0xFF0000)
         except Exception as e:
             log.error(f"[AntiNuke] No pude restaurar canal {channel.name}: {e}")
 
@@ -506,7 +559,7 @@ async def on_guild_channel_create(channel):
             await channel.delete(reason=f"[AntiNuke] Canal no autorizado creado por {autor}")
             await log_antinuke(channel.guild, "🗑️ Canal No Autorizado Eliminado",
                 f"**Canal:** `#{nombre}`\n**Creado por:** {autor.mention}\n**Acción:** Eliminado automáticamente",
-                color=0xFF8800)
+                color=0xFF0000)
         except Exception as e:
             log.error(f"[AntiNuke] No pude eliminar canal {channel.name}: {e}")
 
@@ -553,7 +606,7 @@ async def on_member_join(member: discord.Member):
             if not es_seguro(autor.id, member.guild):
                 await member.kick(reason="[AntiBot] Bot no autorizado")
                 await log_antinuke(member.guild, "🤖 Bot No Autorizado",
-                    f"**Bot:** {member.mention}\n**Añadido por:** {autor.mention}", color=0xFFAA00)
+                    f"**Bot:** {member.mention}\n**Añadido por:** {autor.mention}", color=0xFF0000)
                 return
         except Exception:
             pass
@@ -577,7 +630,7 @@ async def on_member_join(member: discord.Member):
                 pass
             await log_antinuke(member.guild, "🚨 Raid Detectada",
                 f"**Joins en {ventana}s:** {len(_joins_recents[gid])}\n**Último:** {member.mention}\n**Acción:** `{accion}`",
-                color=0xFF4400)
+                color=0xFF0000)
 
     ver = cfg.get("verificacion", {})
     if ver.get("activo") and ver.get("rol_no_verificado"):
@@ -609,7 +662,7 @@ async def on_message(message: discord.Message):
                 await message.delete()
                 await message.channel.send(f"🔗 {message.author.mention} No se permiten links aquí.", delete_after=5)
                 await log_antinuke(message.guild, "🔗 Link Bloqueado",
-                    f"**Usuario:** {message.author.mention}\n**Canal:** {message.channel.mention}", color=0xFFAA00)
+                    f"**Usuario:** {message.author.mention}\n**Canal:** {message.channel.mention}", color=0xFF0000)
             except Exception:
                 pass
             return
@@ -631,7 +684,7 @@ async def on_message(message: discord.Message):
                 await message.channel.send(f"🔇 {message.author.mention} fue silenciado por spam.", delete_after=5)
                 _spam_tracker[gid][uid] = []
                 await log_antinuke(message.guild, "💬 Spam Detectado",
-                    f"**Usuario:** {message.author.mention}\n**Canal:** {message.channel.mention}", color=0xFF8800)
+                    f"**Usuario:** {message.author.mention}\n**Canal:** {message.channel.mention}", color=0xFF0000)
             except Exception:
                 pass
 
@@ -691,7 +744,7 @@ async def antinuke_status(ctx):
             wl_members.append(m.mention)
     wl_txt = ", ".join(wl_members) if wl_members else "Nadie"
 
-    embed = discord.Embed(title="🛡️ AntiNuke — Panel Completo", color=0x00FF88 if cfg["activo"] else 0xFF0000)
+    embed = discord.Embed(title="🛡️ AntiNuke — Panel Completo", color=0xFF0000 if cfg["activo"] else 0xFF0000)
     embed.add_field(name="Estado",   value=estado,                            inline=True)
     embed.add_field(name="Acción",   value=cfg.get("accion", "ban").upper(),  inline=True)
     embed.add_field(name="Ventana",  value=f"{cfg.get('ventana', 10)}s",      inline=True)
@@ -718,7 +771,7 @@ async def antinuke_status(ctx):
 @commands.check(es_owner_an)
 async def an_ayuda(ctx):
     p = PREFIX
-    embed = discord.Embed(title="🛡️ AntiNuke — Comandos", color=0x00FF88)
+    embed = discord.Embed(title="🛡️ AntiNuke — Comandos", color=0xFF0000)
     embed.add_field(name="⚙️ General",
         value=(
             f"`{p}antinuke` — Panel de estado\n"
@@ -788,7 +841,7 @@ async def an_whitelist(ctx, member: discord.Member = None):
         embed = discord.Embed(
             title=f"🛡️ Whitelist — {ctx.guild.name}",
             description="\n".join(wl_members) if wl_members else "Nadie en la whitelist.",
-            color=0x00FF88
+            color=0xFF0000
         )
         return await ctx.send(embed=embed)
 
@@ -809,7 +862,7 @@ async def an_whitelist(ctx, member: discord.Member = None):
         embed = discord.Embed(
             title="✅ Añadido a Whitelist",
             description=f"{member.mention} ahora está en la whitelist de **{ctx.guild.name}**.\nEl AntiNuke lo ignorará en este servidor.",
-            color=discord.Color.green()
+            color=discord.Color.red()
         )
     embed.set_thumbnail(url=member.display_avatar.url)
     await ctx.send(embed=embed)
@@ -865,7 +918,7 @@ async def an_owner(ctx, member: discord.Member):
 async def an_antiraid_status(ctx):
     cfg = cargar_antinuke(ctx.guild.id)
     ar  = cfg.get("antiraid", {})
-    embed = discord.Embed(title="🚨 AntiRaid", color=0x00FF88 if ar.get("activo") else 0xFF0000)
+    embed = discord.Embed(title="🚨 AntiRaid", color=0xFF0000 if ar.get("activo") else 0xFF0000)
     embed.add_field(name="Estado",   value="✅ Activo" if ar.get("activo") else "❌ Desactivado", inline=True)
     embed.add_field(name="Límite",   value=f"{ar.get('joins_limite',10)} joins", inline=True)
     embed.add_field(name="Ventana",  value=f"{ar.get('joins_ventana',10)}s",     inline=True)
@@ -986,7 +1039,7 @@ async def an_ver_setup(ctx, canal: discord.TextChannel, rol_ver: discord.Role, r
     embed = discord.Embed(
         title="✅ Verificación",
         description=f"Reacciona con ✅ para verificarte y acceder al servidor.",
-        color=discord.Color.green()
+        color=discord.Color.red()
     )
     msg = await canal.send(embed=embed)
     await msg.add_reaction("✅")
@@ -1034,7 +1087,7 @@ async def warn(ctx, member: discord.Member, *, razon: str = "Sin razón"):
     })
     guardar_warns(data)
     total = len(data[uid])
-    embed = discord.Embed(title="⚠️ Advertencia", color=discord.Color.orange())
+    embed = discord.Embed(title="⚠️ Advertencia", color=discord.Color.red())
     embed.add_field(name="👤 Usuario",  value=member.mention,    inline=True)
     embed.add_field(name="📋 Razón",    value=razon,              inline=True)
     embed.add_field(name="📊 Total",    value=f"{total} warn(s)", inline=True)
@@ -1058,7 +1111,7 @@ async def ver_warns(ctx, member: discord.Member = None):
     member = member or ctx.author
     data   = cargar_warns()
     lista  = data.get(str(member.id), [])
-    embed  = discord.Embed(title=f"⚠️ Warns de {member.display_name}", color=discord.Color.orange())
+    embed  = discord.Embed(title=f"⚠️ Warns de {member.display_name}", color=discord.Color.red())
     embed.set_thumbnail(url=member.display_avatar.url)
     if not lista:
         embed.description = "✅ Sin advertencias."
@@ -1135,7 +1188,7 @@ async def casar(ctx, member: discord.Member):
     if mid in parejas:
         return await ctx.send(f"💔 {member.mention} ya está casado/a.")
     propuestas_pendientes[member.id] = ctx.author.id
-    embed = discord.Embed(title="💍 ¡Propuesta!", description=f"{ctx.author.mention} le propone a {member.mention}\nUsa `{PREFIX}aceptar` o `{PREFIX}rechazar` en 60s.", color=discord.Color.pink())
+    embed = discord.Embed(title="💍 ¡Propuesta!", description=f"{ctx.author.mention} le propone a {member.mention}\nUsa `{PREFIX}aceptar` o `{PREFIX}rechazar` en 60s.", color=discord.Color.red())
     await ctx.send(embed=embed)
     await asyncio.sleep(60)
     if propuestas_pendientes.get(member.id) == ctx.author.id:
@@ -1151,7 +1204,7 @@ async def aceptar(ctx):
     mid = str(ctx.author.id)
     parejas[str(autor_id)] = mid; parejas[mid] = str(autor_id)
     guardar_parejas(parejas)
-    embed = discord.Embed(title="💒 ¡Se casaron!", description=f"{ctx.author.mention} y <@{autor_id}> ¡Felicidades! 🎉", color=discord.Color.gold())
+    embed = discord.Embed(title="💒 ¡Se casaron!", description=f"{ctx.author.mention} y <@{autor_id}> ¡Felicidades! 🎉", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="rechazar")
@@ -1177,7 +1230,7 @@ async def ver_pareja(ctx, member: discord.Member = None):
     parejas = cargar_parejas(); uid = str(member.id)
     if uid not in parejas:
         return await ctx.send(f"💔 {member.display_name} no está casado/a.")
-    embed = discord.Embed(title="💍 Estado Civil", description=f"{member.mention} está con <@{parejas[uid]}> 💕", color=discord.Color.pink())
+    embed = discord.Embed(title="💍 Estado Civil", description=f"{member.mention} está con <@{parejas[uid]}> 💕", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="adoptar")
@@ -1189,7 +1242,7 @@ async def adoptar(ctx, member: discord.Member):
     if mid in hijos:
         return await ctx.send(f"❌ {member.mention} ya es tu hijo/a.")
     hijos.append(mid); familia[uid] = hijos; guardar_familia(familia)
-    embed = discord.Embed(title="👨‍👧 ¡Adopción!", description=f"{ctx.author.mention} adoptó a {member.mention} 💕", color=discord.Color.green())
+    embed = discord.Embed(title="👨‍👧 ¡Adopción!", description=f"{ctx.author.mention} adoptó a {member.mention} 💕", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="familia")
@@ -1197,7 +1250,7 @@ async def ver_familia(ctx, member: discord.Member = None):
     member = member or ctx.author
     familia = cargar_familia(); parejas = cargar_parejas(); uid = str(member.id)
     hijos = familia.get(uid, []); pareja = parejas.get(uid)
-    embed = discord.Embed(title=f"👨‍👩‍👧 Familia de {member.display_name}", color=discord.Color.green())
+    embed = discord.Embed(title=f"👨‍👩‍👧 Familia de {member.display_name}", color=discord.Color.red())
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name="💍 Pareja", value=f"<@{pareja}>" if pareja else "Soltero/a", inline=False)
     embed.add_field(name="👶 Hijos", value="\n".join(f"<@{h}>" for h in hijos) if hijos else "Sin hijos", inline=False)
@@ -1240,7 +1293,7 @@ async def horoscopo(ctx, *, signo: str):
     if signo not in SIGNOS:
         return await ctx.send(f"❌ Opciones: {', '.join(f'`{s}`' for s in SIGNOS)}")
     emoji, fechas, desc = SIGNOS[signo]
-    embed = discord.Embed(title=f"{emoji} {signo.capitalize()}", color=random.randint(0x880000, 0xFFFFFF))
+    embed = discord.Embed(title=f"{emoji} {signo.capitalize()}", color=0xFF0000)
     embed.add_field(name="📅 Fechas", value=fechas, inline=True)
     embed.add_field(name="🍀 Suerte", value=f"{random.randint(1,100)}%", inline=True)
     embed.add_field(name="✨ Personalidad", value=desc, inline=False)
@@ -1264,7 +1317,7 @@ async def personalidad(ctx, member: discord.Member = None):
     random.seed(member.id + datetime.now(timezone.utc).toordinal())
     tipo, desc = random.choice(TIPOS_PERSONALIDAD)
     random.seed()
-    embed = discord.Embed(title=f"🔮 {member.display_name}", description=f"**{tipo}**\n\n{desc}", color=discord.Color.purple())
+    embed = discord.Embed(title=f"🔮 {member.display_name}", description=f"**{tipo}**\n\n{desc}", color=discord.Color.red())
     embed.set_thumbnail(url=member.display_avatar.url)
     await ctx.send(embed=embed)
 
@@ -1274,9 +1327,9 @@ async def compatibilidad(ctx, member: discord.Member):
     random.seed(ids[0] + ids[1])
     pct = random.randint(1, 100)
     random.seed()
-    if pct >= 80:   estado = "💞 ¡Almas gemelas!"; color = discord.Color.pink()
-    elif pct >= 60: estado = "💕 Buena compatibilidad"; color = discord.Color.magenta()
-    elif pct >= 40: estado = "🤝 Compatible con esfuerzo"; color = discord.Color.yellow()
+    if pct >= 80:   estado = "💞 ¡Almas gemelas!"; color = discord.Color.red()
+    elif pct >= 60: estado = "💕 Buena compatibilidad"; color = discord.Color.red()
+    elif pct >= 40: estado = "🤝 Compatible con esfuerzo"; color = discord.Color.red()
     else:           estado = "💔 Difícil combinación"; color = discord.Color.red()
     barra = "█"*(pct//10) + "░"*(10-pct//10)
     embed = discord.Embed(title="💘 Compatibilidad", color=color)
@@ -1318,7 +1371,7 @@ async def trivia(ctx):
     ops = p["ops"].copy(); random.shuffle(ops)
     nums = ["1️⃣","2️⃣","3️⃣","4️⃣"]
     desc = "\n".join(f"{nums[i]} {op.capitalize()}" for i, op in enumerate(ops))
-    embed = discord.Embed(title="🃏 Trivia", description=f"**{p['p']}**\n\n{desc}", color=discord.Color.blurple())
+    embed = discord.Embed(title="🃏 Trivia", description=f"**{p['p']}**\n\n{desc}", color=discord.Color.red())
     msg = await ctx.send(embed=embed)
     for emoji in nums[:len(ops)]: await msg.add_reaction(emoji)
     juegos_activos[ctx.channel.id] = True
@@ -1345,7 +1398,7 @@ async def adivina_numero(ctx, maximo: int = 100):
     juegos_activos[ctx.channel.id] = True
     intentos = 0; max_intentos = 5
     embed = discord.Embed(title="🔢 Adivina el Número",
-        description=f"Número entre **1 y {maximo}**. Tienes **{max_intentos} intentos**.", color=discord.Color.blurple())
+        description=f"Número entre **1 y {maximo}**. Tienes **{max_intentos} intentos**.", color=discord.Color.red())
     await ctx.send(embed=embed)
     def check(m): return m.channel == ctx.channel and not m.author.bot and m.content.isdigit()
     while intentos < max_intentos:
@@ -1389,14 +1442,14 @@ async def frase_personaje(ctx, *, personaje: str = None):
     if personaje not in FRASES_PERSONAJES:
         return await ctx.send(f"❌ Disponibles: {', '.join(f'`{p}`' for p in pers)}")
     frase = random.choice(FRASES_PERSONAJES[personaje])
-    colores = [discord.Color.red(), discord.Color.blue(), discord.Color.green(), discord.Color.purple(), discord.Color.orange()]
+    colores = [discord.Color.red(), discord.Color.red(), discord.Color.red(), discord.Color.red(), discord.Color.red()]
     embed = discord.Embed(title=f"💬 {personaje.capitalize()}", description=f"*\"{frase}\"*", color=random.choice(colores))
     await ctx.send(embed=embed)
 
 @bot.command(name="personajes_lista", aliases=["pl"])
 async def personajes_lista(ctx):
     lista = ", ".join(f"`{p.capitalize()}`" for p in FRASES_PERSONAJES)
-    embed = discord.Embed(title="💬 Personajes disponibles", description=lista, color=discord.Color.blurple())
+    embed = discord.Embed(title="💬 Personajes disponibles", description=lista, color=discord.Color.red())
     await ctx.send(embed=embed)
 
 
@@ -1420,7 +1473,7 @@ async def unlock(ctx, canal: discord.TextChannel = None, *, razon: str = "Sin ra
     canal = canal or ctx.channel
     ow = canal.overwrites_for(ctx.guild.default_role); ow.send_messages = None
     await canal.set_permissions(ctx.guild.default_role, overwrite=ow, reason=f"[{ctx.author}] {razon}")
-    embed = discord.Embed(title="🔓 Canal Desbloqueado", description=f"{canal.mention}\n📋 {razon}", color=discord.Color.green())
+    embed = discord.Embed(title="🔓 Canal Desbloqueado", description=f"{canal.mention}\n📋 {razon}", color=discord.Color.red())
     await canal.send(embed=embed)
     if canal != ctx.channel: await ctx.send(f"✅ {canal.mention} desbloqueado.")
 
@@ -1447,7 +1500,7 @@ async def unlockall(ctx, *, razon: str = "Sin razón"):
             ow = c.overwrites_for(ctx.guild.default_role); ow.send_messages = None
             await c.set_permissions(ctx.guild.default_role, overwrite=ow); count += 1
         except Exception: pass
-    embed = discord.Embed(title="🔓 Servidor Desbloqueado", description=f"**{count}** canales.\n📋 {razon}", color=discord.Color.green())
+    embed = discord.Embed(title="🔓 Servidor Desbloqueado", description=f"**{count}** canales.\n📋 {razon}", color=discord.Color.red())
     await msg.edit(content=None, embed=embed)
 
 @bot.command(name="slowmode", aliases=["sm","modo_lento"])
@@ -1623,14 +1676,14 @@ async def listar_roles(ctx):
         chunk += linea
     if chunk: paginas.append(chunk)
     for i, p in enumerate(paginas, 1):
-        embed = discord.Embed(title=f"🎭 Roles ({i}/{len(paginas)})", description=p, color=discord.Color.blurple())
+        embed = discord.Embed(title=f"🎭 Roles ({i}/{len(paginas)})", description=p, color=discord.Color.red())
         await ctx.send(embed=embed)
 
 @bot.command(name="anuncio", aliases=["ann"])
 @commands.check(es_admin)
 async def anuncio(ctx, canal: discord.TextChannel = None, *, mensaje: str):
     canal = canal or ctx.channel
-    embed = discord.Embed(title="📢 Anuncio", description=mensaje, color=discord.Color.gold(), timestamp=datetime.now(timezone.utc))
+    embed = discord.Embed(title="📢 Anuncio", description=mensaje, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
     await canal.send("@everyone", embed=embed)
     if canal != ctx.channel: await ctx.send(f"✅ Anuncio en {canal.mention}.")
 
@@ -1638,7 +1691,7 @@ async def anuncio(ctx, canal: discord.TextChannel = None, *, mensaje: str):
 @commands.check(es_admin)
 async def embed_msg(ctx, canal: discord.TextChannel = None, titulo: str = "Mensaje", *, mensaje: str):
     canal = canal or ctx.channel
-    embed = discord.Embed(title=titulo, description=mensaje, color=discord.Color.blurple(), timestamp=datetime.now(timezone.utc))
+    embed = discord.Embed(title=titulo, description=mensaje, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
     await canal.send(embed=embed)
     if canal != ctx.channel: await ctx.send(f"✅ Embed en {canal.mention}.")
 
@@ -1671,7 +1724,7 @@ async def unban_cmd(ctx, *, usuario: str):
             objetivo = entry.user; break
     if not objetivo: return await ctx.send(f"❌ No encontré `{usuario}` en los bans.")
     await ctx.guild.unban(objetivo, reason=f"Desbaneado por {ctx.author}")
-    embed = discord.Embed(title="✅ Desbaneado", color=discord.Color.green())
+    embed = discord.Embed(title="✅ Desbaneado", color=discord.Color.red())
     embed.add_field(name="👤 Usuario", value=f"{objetivo} (`{objetivo.id}`)", inline=True)
     embed.add_field(name="👮 Por",     value=ctx.author.mention, inline=True)
     await ctx.send(embed=embed)
@@ -1683,7 +1736,7 @@ async def kick_cmd(ctx, member: discord.Member, *, razon: str = "Sin razón"):
     try:
         await ctx.guild.kick(member, reason=f"[{ctx.author}] {razon}")
     except discord.Forbidden: return await ctx.send("❌ Sin permisos.")
-    embed = discord.Embed(title="👢 Expulsado", color=discord.Color.orange())
+    embed = discord.Embed(title="👢 Expulsado", color=discord.Color.red())
     embed.add_field(name="👤 Usuario", value=str(member),       inline=True)
     embed.add_field(name="📋 Razón",   value=razon,             inline=True)
     embed.add_field(name="👮 Por",     value=ctx.author.mention, inline=True)
@@ -1698,7 +1751,7 @@ async def mute_cmd(ctx, member: discord.Member, minutos: int = 10, *, razon: str
         until = discord.utils.utcnow() + dt.timedelta(minutes=minutos)
         await member.timeout(until, reason=f"[{ctx.author}] {razon}")
     except discord.Forbidden: return await ctx.send("❌ Sin permisos.")
-    embed = discord.Embed(title="🔇 Muteado", color=discord.Color.dark_grey())
+    embed = discord.Embed(title="🔇 Muteado", color=discord.Color.red())
     embed.add_field(name="👤 Usuario",   value=member.mention,     inline=True)
     embed.add_field(name="⏰ Duración",  value=f"{minutos} min",   inline=True)
     embed.add_field(name="📋 Razón",     value=razon,              inline=True)
@@ -1736,24 +1789,12 @@ async def limpiar_usuario(ctx, member: discord.Member, cantidad: int = 50):
     msg = await ctx.send(f"🗑️ **{len(borrados)}** mensajes de {member.mention} borrados.")
     await asyncio.sleep(3); await msg.delete()
 
-@bot.command(name="userinfo", aliases=["ui","whois"])
-async def userinfo(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    roles = [r.mention for r in member.roles if r != ctx.guild.default_role]
-    embed = discord.Embed(title=f"👤 {member}", color=member.color)
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="🆔 ID",            value=member.id,                              inline=True)
-    embed.add_field(name="📅 Cuenta",         value=member.created_at.strftime("%d/%m/%Y"), inline=True)
-    embed.add_field(name="📥 Se unió",        value=member.joined_at.strftime("%d/%m/%Y"),  inline=True)
-    embed.add_field(name="🎨 Color",          value=str(member.color),                      inline=True)
-    embed.add_field(name="🤖 Bot",            value="Sí" if member.bot else "No",           inline=True)
-    embed.add_field(name="🏆 Roles",          value=" ".join(roles) if roles else "Sin roles", inline=False)
-    await ctx.send(embed=embed)
+# [userinfo reemplazado por la interfaz ZyroX — ver más abajo]
 
 @bot.command(name="serverinfo", aliases=["si","servidor"])
 async def serverinfo(ctx):
     g = ctx.guild
-    embed = discord.Embed(title=f"🏠 {g.name}", color=discord.Color.blurple())
+    embed = discord.Embed(title=f"🏠 {g.name}", color=discord.Color.red())
     if g.icon: embed.set_thumbnail(url=g.icon.url)
     embed.add_field(name="🆔 ID",       value=g.id,              inline=True)
     embed.add_field(name="👑 Dueño",    value=g.owner.mention,   inline=True)
@@ -1963,7 +2004,7 @@ async def dar_rol_arn(ctx, member: discord.Member):
             f"🗑️ **Quitar todos** — elimina todos los roles del usuario\n\n"
             f"O pulsa **✅ Confirmar** para usar los valores por defecto."
         ),
-        color=discord.Color.blurple()
+        color=discord.Color.red()
     )
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name="👤 Usuario",           value=member.mention,              inline=True)
@@ -2024,7 +2065,7 @@ async def dar_rol_arn(ctx, member: discord.Member):
     except discord.Forbidden:
         return await ctx.send(f"❌ No pude asignar **{rol_dar.name}**. Sube el rol del bot en la jerarquía.")
 
-    embed_ok = discord.Embed(title="✅ Acceso Concedido", color=discord.Color.green())
+    embed_ok = discord.Embed(title="✅ Acceso Concedido", color=discord.Color.red())
     embed_ok.set_thumbnail(url=member.display_avatar.url)
     embed_ok.add_field(name="👤 Miembro",   value=member.mention,        inline=True)
     embed_ok.add_field(name="✅ Rol dado",  value=f"**{rol_dar.name}**", inline=True)
@@ -2088,7 +2129,7 @@ async def setprefix(ctx, nuevo: str):
 @bot.command(name="ping")
 async def ping(ctx):
     lat = round(bot.latency * 1000)
-    color = discord.Color.green() if lat < 100 else discord.Color.yellow() if lat < 200 else discord.Color.red()
+    color = discord.Color.red() if lat < 100 else discord.Color.red() if lat < 200 else discord.Color.red()
     await ctx.send(embed=discord.Embed(title="🏓 Pong!", description=f"**{lat}ms**", color=color))
 
 @bot.command(name="avatar", aliases=["av","foto"])
@@ -2115,7 +2156,7 @@ async def stats(ctx):
     bots    = sum(1 for m in g.members if m.bot)
     humanos = total - bots
     en_linea = sum(1 for m in g.members if m.status != discord.Status.offline and not m.bot)
-    embed = discord.Embed(title=f"📊 {g.name}", color=discord.Color.blurple())
+    embed = discord.Embed(title=f"📊 {g.name}", color=discord.Color.red())
     if g.icon: embed.set_thumbnail(url=g.icon.url)
     embed.add_field(name="👥 Total",    value=total,    inline=True)
     embed.add_field(name="🧑 Humanos",  value=humanos,  inline=True)
@@ -2130,7 +2171,7 @@ async def stats(ctx):
 @bot.command(name="botinfo", aliases=["bot_info"])
 async def botinfo(ctx):
     import platform
-    embed = discord.Embed(title="🤖 Info del Bot", color=discord.Color.blurple())
+    embed = discord.Embed(title="🤖 Info del Bot", color=discord.Color.red())
     embed.set_thumbnail(url=bot.user.display_avatar.url)
     embed.add_field(name="🏷️ Nombre",    value=str(bot.user),           inline=True)
     embed.add_field(name="🆔 ID",        value=bot.user.id,             inline=True)
@@ -2145,7 +2186,7 @@ async def botinfo(ctx):
 @bot.command(name="invitar", aliases=["invite"])
 async def invitar(ctx):
     url = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot"
-    embed = discord.Embed(title="🔗 Invitar", description=f"[Clic aquí]({url})", color=discord.Color.blurple())
+    embed = discord.Embed(title="🔗 Invitar", description=f"[Clic aquí]({url})", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="clima", aliases=["weather","tiempo"])
@@ -2156,7 +2197,7 @@ async def clima(ctx, *, ciudad: str):
                 if resp.status != 200: return await ctx.send("❌ Ciudad no encontrada.")
                 data    = await resp.json()
                 actual  = data["current_condition"][0]
-                embed   = discord.Embed(title=f"🌤️ {ciudad.title()}", color=discord.Color.blue())
+                embed   = discord.Embed(title=f"🌤️ {ciudad.title()}", color=discord.Color.red())
                 embed.add_field(name="🌡️ Temp",      value=f"{actual['temp_C']}°C",       inline=True)
                 embed.add_field(name="🤔 Sensación", value=f"{actual['FeelsLikeC']}°C",   inline=True)
                 embed.add_field(name="💧 Humedad",   value=f"{actual['humidity']}%",       inline=True)
@@ -2172,7 +2213,7 @@ async def traducir(ctx, idioma: str, *, texto: str):
             async with session.get(f"https://api.mymemory.translated.net/get?q={texto}&langpair=es|{idioma}") as resp:
                 data = await resp.json()
                 trad = data["responseData"]["translatedText"]
-                embed = discord.Embed(title="🌍 Traducción", color=discord.Color.teal())
+                embed = discord.Embed(title="🌍 Traducción", color=discord.Color.red())
                 embed.add_field(name="📝 Original",  value=texto, inline=False)
                 embed.add_field(name="✅ Traducido", value=trad,  inline=False)
                 embed.add_field(name="🌐 Idioma",    value=idioma, inline=True)
@@ -2185,7 +2226,7 @@ async def calcular(ctx, *, expresion: str):
         if not all(c in "0123456789+-*/.() " for c in expresion):
             return await ctx.send("❌ Solo `+ - * / ( )`.")
         resultado = eval(expresion)
-        embed = discord.Embed(title="🧮 Calculadora", color=discord.Color.green())
+        embed = discord.Embed(title="🧮 Calculadora", color=discord.Color.red())
         embed.add_field(name="📝", value=f"`{expresion}`",  inline=False)
         embed.add_field(name="✅", value=f"**{resultado}**", inline=False)
         await ctx.send(embed=embed)
@@ -2208,7 +2249,7 @@ async def color_cmd(ctx, *, hex_color: str):
 @bot.command(name="sugerencia", aliases=["suggest"])
 async def sugerencia(ctx, canal: discord.TextChannel = None, *, texto: str):
     canal = canal or ctx.channel
-    embed = discord.Embed(title="💡 Sugerencia", description=texto, color=discord.Color.yellow(), timestamp=datetime.now(timezone.utc))
+    embed = discord.Embed(title="💡 Sugerencia", description=texto, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
     embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
     msg = await canal.send(embed=embed)
     await msg.add_reaction("✅"); await msg.add_reaction("❌")
@@ -2237,7 +2278,7 @@ async def dado_personalizado(ctx, cantidad: int = 1, lados: int = 6):
     if not 2 <= lados <= 1000: return await ctx.send("❌ Entre 2 y 1000 lados.")
     resultados = [random.randint(1, lados) for _ in range(cantidad)]
     total = sum(resultados)
-    embed = discord.Embed(title=f"🎲 {cantidad}d{lados}", color=discord.Color.blurple())
+    embed = discord.Embed(title=f"🎲 {cantidad}d{lados}", color=discord.Color.red())
     embed.add_field(name="Resultados", value=" + ".join(f"`{r}`" for r in resultados), inline=False)
     embed.add_field(name="Total", value=f"**{total}**", inline=True)
     if cantidad > 1: embed.add_field(name="Promedio", value=f"**{total/cantidad:.1f}**", inline=True)
@@ -2255,7 +2296,7 @@ async def recordar(ctx, tiempo: str, *, mensaje: str):
     await ctx.send(f"⏰ Te recordaré en **{cantidad} {nombres[unidad]}**.")
     await asyncio.sleep(segundos)
     try:
-        embed = discord.Embed(title="⏰ Recordatorio", description=mensaje, color=discord.Color.orange(), timestamp=datetime.now(timezone.utc))
+        embed = discord.Embed(title="⏰ Recordatorio", description=mensaje, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
         await ctx.author.send(embed=embed)
     except Exception: pass
     await ctx.send(f"⏰ {ctx.author.mention} ¡Recordatorio! **{mensaje}**")
@@ -2302,7 +2343,7 @@ async def cumple_ver(ctx, member: discord.Member = None):
     este = datetime(hoy.year, mes, dia, tzinfo=timezone.utc)
     if este < hoy: este = datetime(hoy.year + 1, mes, dia, tzinfo=timezone.utc)
     dias = (este - hoy).days
-    embed = discord.Embed(title=f"🎂 {member.display_name}", color=discord.Color.gold())
+    embed = discord.Embed(title=f"🎂 {member.display_name}", color=discord.Color.red())
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name="📅 Fecha", value=fecha, inline=True)
     embed.add_field(name="⏰ Faltan", value=f"**{dias}** días", inline=True)
@@ -2321,7 +2362,7 @@ async def cumples_lista(ctx):
             lista.append(((este - hoy).days, uid, fecha))
         except Exception: pass
     lista.sort()
-    embed = discord.Embed(title="🎂 Próximos Cumpleaños", color=discord.Color.gold())
+    embed = discord.Embed(title="🎂 Próximos Cumpleaños", color=discord.Color.red())
     for dias, uid, fecha in lista[:10]:
         member = ctx.guild.get_member(int(uid))
         nombre = member.display_name if member else f"<@{uid}>"
@@ -2337,14 +2378,14 @@ async def cumples_lista(ctx):
 async def dado(ctx, lados: int = 6):
     if not 2 <= lados <= 100: return await ctx.send("❌ Entre 2 y 100.")
     resultado = random.randint(1, lados)
-    embed = discord.Embed(title="🎲 Dado", color=discord.Color.blurple())
+    embed = discord.Embed(title="🎲 Dado", color=discord.Color.red())
     embed.add_field(name=f"D{lados}", value=f"**{resultado}**", inline=True)
     await ctx.send(embed=embed)
 
 @bot.command(name="moneda", aliases=["coin","flip"])
 async def moneda(ctx):
     resultado = random.choice(["🪙 Cara", "🪙 Sello"])
-    embed = discord.Embed(title="🪙 Moneda", description=f"**{resultado}**", color=discord.Color.gold())
+    embed = discord.Embed(title="🪙 Moneda", description=f"**{resultado}**", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="ruleta", aliases=["roulette"])
@@ -2363,7 +2404,7 @@ async def bola_ocho(ctx, *, pregunta: str):
         "🤔 No está claro.","🤔 Concéntrate y pregunta de nuevo.",
         "❌ No cuentes con ello.","❌ Mi respuesta es no.","❌ Definitivamente no."
     ]
-    embed = discord.Embed(title="🎱 Bola Mágica", color=discord.Color.dark_purple())
+    embed = discord.Embed(title="🎱 Bola Mágica", color=discord.Color.red())
     embed.add_field(name="❓ Pregunta", value=pregunta, inline=False)
     embed.add_field(name="🔮 Respuesta", value=random.choice(respuestas), inline=False)
     await ctx.send(embed=embed)
@@ -2375,11 +2416,11 @@ async def piedra_papel_tijera(ctx, eleccion: str):
     if eleccion not in opciones: return await ctx.send("❌ `piedra`, `papel` o `tijera`")
     bot_eleccion = random.choice(opciones)
     emojis = {"piedra":"🪨","papel":"📄","tijera":"✂️"}
-    if eleccion == bot_eleccion: resultado = "🤝 Empate"; color = discord.Color.yellow()
+    if eleccion == bot_eleccion: resultado = "🤝 Empate"; color = discord.Color.red()
     elif (eleccion=="piedra" and bot_eleccion=="tijera") or \
          (eleccion=="papel"  and bot_eleccion=="piedra") or \
          (eleccion=="tijera" and bot_eleccion=="papel"):
-        resultado = "🏆 ¡Ganaste!"; color = discord.Color.green()
+        resultado = "🏆 ¡Ganaste!"; color = discord.Color.red()
     else: resultado = "😈 ¡Perdiste!"; color = discord.Color.red()
     embed = discord.Embed(title="🎮 RPS", description=resultado, color=color)
     embed.add_field(name="Tú",  value=emojis[eleccion],     inline=True)
@@ -2404,7 +2445,7 @@ async def verdad_o_reto(ctx, member: discord.Member = None):
     ]
     tipo = random.choice(["Verdad 🔮", "Reto 💥"])
     contenido = random.choice(verdades) if "Verdad" in tipo else random.choice(retos)
-    color = discord.Color.purple() if "Verdad" in tipo else discord.Color.orange()
+    color = discord.Color.red() if "Verdad" in tipo else discord.Color.red()
     embed = discord.Embed(title=f"🎮 {tipo}", description=f"Para {member.mention}\n\n**{contenido}**", color=color)
     await ctx.send(embed=embed)
 
@@ -2419,7 +2460,7 @@ async def acertijo(ctx):
         ("Siempre delante de ti, pero no se puede ver. ¿Qué soy?", "El futuro"),
     ]
     pregunta, respuesta = random.choice(acertijos)
-    embed = discord.Embed(title="🧩 Acertijo", description=pregunta, color=discord.Color.purple())
+    embed = discord.Embed(title="🧩 Acertijo", description=pregunta, color=discord.Color.red())
     await ctx.send(embed=embed)
 
     def check(m): return m.channel == ctx.channel and not m.author.bot
@@ -2457,12 +2498,12 @@ CHISTES = [
 
 @bot.command(name="frase", aliases=["motivacion","quote"])
 async def frase_random(ctx):
-    embed = discord.Embed(title="💬 Frase del día", description=f"*{random.choice(FRASES_MOTIVACION)}*", color=discord.Color.teal())
+    embed = discord.Embed(title="💬 Frase del día", description=f"*{random.choice(FRASES_MOTIVACION)}*", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="chiste", aliases=["joke"])
 async def chiste_random(ctx):
-    embed = discord.Embed(title="😂 Chiste", description=random.choice(CHISTES), color=discord.Color.yellow())
+    embed = discord.Embed(title="😂 Chiste", description=random.choice(CHISTES), color=discord.Color.red())
     await ctx.send(embed=embed)
 
 @bot.command(name="meme")
@@ -2472,7 +2513,7 @@ async def meme_random(ctx):
             async with session.get("https://meme-api.com/gimme") as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    embed = discord.Embed(title=data["title"], color=discord.Color.orange())
+                    embed = discord.Embed(title=data["title"], color=discord.Color.red())
                     embed.set_image(url=data["url"])
                     await ctx.send(embed=embed)
                     return
@@ -2483,7 +2524,7 @@ async def meme_random(ctx):
 async def rng(ctx, minimo: int = 1, maximo: int = 100):
     if minimo >= maximo: return await ctx.send("❌ El mínimo debe ser menor que el máximo.")
     resultado = random.randint(minimo, maximo)
-    embed = discord.Embed(title="🎲 Número Aleatorio", color=discord.Color.blurple())
+    embed = discord.Embed(title="🎲 Número Aleatorio", color=discord.Color.red())
     embed.add_field(name="Rango", value=f"`{minimo}` – `{maximo}`", inline=True)
     embed.add_field(name="Resultado", value=f"**{resultado}**", inline=True)
     await ctx.send(embed=embed)
@@ -2491,7 +2532,7 @@ async def rng(ctx, minimo: int = 1, maximo: int = 100):
 @bot.command(name="buscar", aliases=["google","search"])
 async def buscar(ctx, *, termino: str):
     url = f"https://www.google.com/search?q={termino.replace(' ', '+')}"
-    embed = discord.Embed(title=f"🔍 Buscar: {termino}", description=f"[Haz clic para buscar en Google]({url})", color=discord.Color.blue())
+    embed = discord.Embed(title=f"🔍 Buscar: {termino}", description=f"[Haz clic para buscar en Google]({url})", color=discord.Color.red())
     await ctx.send(embed=embed)
 
 
@@ -2505,7 +2546,7 @@ async def sorteo(ctx, segundos: int, *, premio: str):
     if not 10 <= segundos <= 86400: return await ctx.send("❌ Entre 10s y 24h.")
     embed = discord.Embed(title="🎁 ¡SORTEO!",
         description=f"**Premio:** {premio}\nReacciona con 🎉\n⏰ **{segundos}s**",
-        color=discord.Color.gold())
+        color=discord.Color.red())
     msg = await ctx.send(embed=embed)
     await msg.add_reaction("🎉")
     await asyncio.sleep(segundos)
@@ -2517,7 +2558,7 @@ async def sorteo(ctx, segundos: int, *, premio: str):
     else:
         ganador = random.choice(participantes)
         embed_fin = discord.Embed(title="🎉 ¡Ganador!",
-            description=f"**Premio:** {premio}\n🏆 {ganador.mention}", color=discord.Color.gold())
+            description=f"**Premio:** {premio}\n🏆 {ganador.mention}", color=discord.Color.red())
     await ctx.send(embed=embed_fin)
 
 @bot.command(name="encuesta", aliases=["poll"])
@@ -2528,13 +2569,13 @@ async def encuesta(ctx, *, texto: str):
     if len(opciones) > 9: return await ctx.send("❌ Máximo 9 opciones.")
     nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"]
     desc = "\n".join(f"{nums[i]} {op}" for i, op in enumerate(opciones))
-    embed = discord.Embed(title=f"📊 {pregunta}", description=desc, color=discord.Color.blurple())
+    embed = discord.Embed(title=f"📊 {pregunta}", description=desc, color=discord.Color.red())
     msg = await ctx.send(embed=embed)
     for i in range(len(opciones)): await msg.add_reaction(nums[i])
 
 @bot.command(name="encuesta_si_no", aliases=["yesno"])
 async def encuesta_si_no(ctx, *, pregunta: str):
-    embed = discord.Embed(title=f"📊 {pregunta}", color=discord.Color.blurple())
+    embed = discord.Embed(title=f"📊 {pregunta}", color=discord.Color.red())
     msg = await ctx.send(embed=embed)
     await msg.add_reaction("✅"); await msg.add_reaction("❌")
 
@@ -2544,7 +2585,7 @@ async def encuesta_si_no(ctx, *, pregunta: str):
 # ═════════════════════════════════════════════════════════════
 
 ANIME_ACCIONES = {
-    "abrazar":  {"emoji":"🤗","gif_tag":"hug",   "msg":"{a} abraza a {b} 🤗",             "boton":"Abrazar 🤗"},
+    "abrazar":  {"emoji":"🤗","gif_tag":"hug",   "msg":"{a} abraza a {b} 🤗",             "boton":"Abrazar devuelta 🤗"},
     "pat":      {"emoji":"👋","gif_tag":"pat",    "msg":"{a} le da palmaditas a {b} 👋",   "boton":"Palmaditas 👋"},
     "slap":     {"emoji":"😤","gif_tag":"slap",   "msg":"{a} cachetea a {b} 😤",           "boton":"Devolver 😤"},
     "kiss":     {"emoji":"💋","gif_tag":"kiss",   "msg":"{a} besa a {b} 💋",              "boton":"Beso 💋"},
@@ -2585,7 +2626,7 @@ class AnimeView(discord.ui.View):
             count = get_contador(self.autor.id, self.target.id, self.accion)
             gif   = await obtener_gif_anime(self.info["gif_tag"])
             msg   = self.info["msg"].format(a=self.target.display_name, b=self.autor.display_name)
-            embed = discord.Embed(description=msg, color=discord.Color.pink())
+            embed = discord.Embed(description=msg, color=discord.Color.red())
             if gif: embed.set_image(url=gif)
             await interaction.response.send_message(embed=embed); self.stop()
         async def x_cb(interaction):
@@ -2603,7 +2644,7 @@ def make_anime_cmd(accion, info):
         count = get_contador(ctx.author.id, member.id if member else 0, accion)
         msg   = info["msg"].format(a=a, b=b)
         gif   = await obtener_gif_anime(info["gif_tag"])
-        embed = discord.Embed(description=f"**{msg}**", color=discord.Color.pink())
+        embed = discord.Embed(description=f"**{msg}**", color=discord.Color.red())
         if gif: embed.set_image(url=gif)
         if member and member != ctx.author:
             view = AnimeView(ctx.author, member, accion, info)
@@ -2619,83 +2660,505 @@ for _a, _i in ANIME_ACCIONES.items():
 #  📖 AYUDA
 # ═════════════════════════════════════════════════════════════
 
-@bot.command(name="ayuda", aliases=["help","h","comandos"])
-async def ayuda(ctx):
-    p = PREFIX
-    embed = discord.Embed(
-        title="📖 Comandos del Bot",
-        description=f"Prefix: `{p}` — Bot multipropósito con moderación, AntiNuke, juegos y más",
-        color=discord.Color.blurple()
+# ═══════════════════════════════════════════════════════════════
+#  🔴 INTERFAZ ESTILO ZYROX — Paginación + Dropdown + Userinfo
+#  Reemplaza: ayuda, _build_ayuda_embed, userinfo
+# ═══════════════════════════════════════════════════════════════
+
+# ── Páginas del menú de ayuda ─────────────────────────────────
+def _get_help_pages(p: str):
+    """Devuelve lista de embeds para el menú paginado."""
+    RED = 0xFF0000
+
+    pages = []
+
+    # ─── Página 1: Inicio ─────────────────────────────────────
+    e = discord.Embed(
+        title="🤖 Bienvenido al Panel de Ayuda",
+        description=(
+            f"**Prefijo del servidor:** `{p}`\n"
+            f"**Total de comandos:** `100+`\n\n"
+            f"Usa los botones ⬅️ ➡️ para navegar,\n"
+            f"o el menú desplegable para ir directo a una sección.\n\n"
+            f"*Escribe `{p}ayuda` para ver este menú.*"
+        ),
+        color=RED
     )
-    embed.add_field(name="🌐 Generales",
+    e.add_field(name="🔴 Comandos Principales",
+        value="Moderación · AntiNuke · Roles · Canales · Warns", inline=True)
+    e.add_field(name="🎮 Comandos Extra",
+        value="Juegos · Fun · Anime · Roleplay · Cumpleaños", inline=True)
+    pages.append(e)
+
+    # ─── Página 2: Generales ─────────────────────────────────
+    e = discord.Embed(title="🌐 Comandos Generales", color=RED)
+    e.add_field(name="Información",
         value=(
-            f"`{p}ping` `{p}avatar` `{p}banner` `{p}userinfo` `{p}serverinfo` `{p}stats` `{p}botinfo`\n"
-            f"`{p}clima <ciudad>` `{p}tr <idioma> <texto>` `{p}calc <expr>` `{p}color <hex>`\n"
-            f"`{p}buscar <texto>` `{p}rng [min] [max]` `{p}recordar <tiempo> <msg>`\n"
-            f"`{p}sugerencia <txt>` `{p}reporte @user <razón>` `{p}invitar`"
+            f"`{p}ping` · `{p}avatar` · `{p}banner`\n"
+            f"`{p}userinfo` · `{p}serverinfo`\n"
+            f"`{p}stats` · `{p}botinfo` · `{p}invitar`"
         ), inline=False)
-    embed.add_field(name="🛡️ AntiNuke (Owner)",
+    e.add_field(name="Utilidades",
+        value=(
+            f"`{p}clima <ciudad>` — Clima actual\n"
+            f"`{p}tr <idioma> <texto>` — Traducir\n"
+            f"`{p}calc <expr>` — Calculadora\n"
+            f"`{p}color <hex>` — Ver color\n"
+            f"`{p}buscar <texto>` — Google\n"
+            f"`{p}rng [min] [max]` — Número aleatorio\n"
+            f"`{p}recordar <tiempo> <msg>` — Recordatorio\n"
+            f"`{p}sugerencia <txt>` — Enviar sugerencia\n"
+            f"`{p}reporte @user <razón>` — Reportar"
+        ), inline=False)
+    pages.append(e)
+
+    # ─── Página 3: AntiNuke ───────────────────────────────────
+    e = discord.Embed(title="🛡️ Comandos AntiNuke", color=RED)
+    e.add_field(name="General",
         value=(
             f"`{p}antinuke` — Panel completo\n"
-            f"`{p}an_ayuda` — Todos los comandos AntiNuke\n"
-            f"AntiRaid | AntiLinks | AntiSpam | AntiBot | Verificación"
+            f"`{p}an_ayuda` — Lista de comandos\n"
+            f"`{p}an_activar` / `{p}an_desactivar`\n"
+            f"`{p}an_accion <ban/kick/strip>` — Acción al nuke\n"
+            f"`{p}an_limite <tipo> <n>` — Límite de acciones\n"
+            f"`{p}an_ventana <seg>` — Ventana de tiempo\n"
+            f"`{p}an_owner @user` — Asignar owner\n"
+            f"`{p}an_logs #canal` — Canal de logs"
         ), inline=False)
-    embed.add_field(name="⚠️ Warns (Staff)",
-        value=f"`{p}warn @u <razón>` `{p}warns [@u]` `{p}clearwarns @u` `{p}delwarn @u <n>`",
-        inline=False)
-    embed.add_field(name="🔒 Moderación (Admin)",
+    e.add_field(name="Whitelist",
         value=(
-            f"`{p}ban @u` `{p}unban <user>` `{p}kick @u` `{p}mute @u [min]` `{p}unmute @u`\n"
-            f"`{p}limpiar [n]` `{p}limpiar_bots` `{p}limpiar_usuario @u`\n"
-            f"`{p}nick @u <nuevo>` `{p}massnick <nick>`"
+            f"`{p}an_whitelist @user` — Añadir\n"
+            f"`{p}an_whitelist remove @user` — Quitar\n"
+            f"`{p}an_whitelist list` — Ver lista"
         ), inline=False)
-    embed.add_field(name="🔒 Canales (Admin)",
+    e.add_field(name="Módulos",
         value=(
-            f"`{p}lock` `{p}unlock` `{p}lockall` `{p}unlockall`\n"
-            f"`{p}hide` `{p}show` `{p}slowmode [s]` `{p}topic <txt>`\n"
-            f"`{p}cc <nombre>` `{p}ec` `{p}rc <nombre>` `{p}clone` `{p}nsfw`"
+            f"`{p}an_antiraid_on/off` — AntiRaid\n"
+            f"`{p}an_antilinks_on/off` — AntiLinks\n"
+            f"`{p}an_antispam_on/off` — AntiSpam\n"
+            f"`{p}an_antibot_on/off` — AntiBot"
         ), inline=False)
-    embed.add_field(name="🎭 Roles (Admin)",
+    pages.append(e)
+
+    # ─── Página 4: Moderación ────────────────────────────────
+    e = discord.Embed(title="🔒 Comandos de Moderación", color=RED,
+        description="*Requieren permiso de Administrador*")
+    e.add_field(name="Sanciones",
         value=(
-            f"`{p}dr @u <rol>` — Dar rol (busca por nombre)\n"
+            f"`{p}ban @u [razón]` — Banear\n"
+            f"`{p}unban <user>` — Desbanear\n"
+            f"`{p}kick @u [razón]` — Expulsar\n"
+            f"`{p}mute @u [minutos]` — Silenciar\n"
+            f"`{p}unmute @u` — Des-silenciar"
+        ), inline=True)
+    e.add_field(name="Mensajes",
+        value=(
+            f"`{p}limpiar [n]` — Purgar mensajes\n"
+            f"`{p}limpiar_bots` — Purgar bots\n"
+            f"`{p}limpiar_usuario @u` — Purgar de user"
+        ), inline=True)
+    e.add_field(name="Nicks",
+        value=(
+            f"`{p}nick @u <nuevo>` — Cambiar nick\n"
+            f"`{p}massnick <nick>` — Nick masivo"
+        ), inline=False)
+    pages.append(e)
+
+    # ─── Página 5: Warns ─────────────────────────────────────
+    e = discord.Embed(title="⚠️ Sistema de Warns", color=RED,
+        description="*Requieren rol de Staff o Administrador*")
+    e.add_field(name="Comandos",
+        value=(
+            f"`{p}warn @u <razón>` — Advertir\n"
+            f"`{p}warns [@u]` — Ver advertencias\n"
+            f"`{p}clearwarns @u` — Borrar todas\n"
+            f"`{p}delwarn @u <n>` — Borrar warn #n"
+        ), inline=False)
+    pages.append(e)
+
+    # ─── Página 6: Canales ───────────────────────────────────
+    e = discord.Embed(title="💬 Comandos de Canales", color=RED,
+        description="*Requieren permiso de Administrador*")
+    e.add_field(name="Control",
+        value=(
+            f"`{p}lock` / `{p}unlock` — Bloquear canal\n"
+            f"`{p}lockall` / `{p}unlockall` — Bloquear todos\n"
+            f"`{p}hide` / `{p}show` — Ocultar canal\n"
+            f"`{p}slowmode [seg]` — Modo lento\n"
+            f"`{p}topic <txt>` — Cambiar tema"
+        ), inline=True)
+    e.add_field(name="Gestión",
+        value=(
+            f"`{p}cc <nombre>` — Crear canal\n"
+            f"`{p}ec` — Eliminar canal\n"
+            f"`{p}rc <nombre>` — Renombrar canal\n"
+            f"`{p}clone` — Clonar canal\n"
+            f"`{p}nsfw` — Toggle NSFW"
+        ), inline=True)
+    pages.append(e)
+
+    # ─── Página 7: Roles ─────────────────────────────────────
+    e = discord.Embed(title="🎭 Comandos de Roles", color=RED,
+        description="*Requieren permiso de Administrador*")
+    e.add_field(name="Usuarios",
+        value=(
+            f"`{p}dr @u <rol>` — Dar rol\n"
             f"`{p}qr @u <rol>` — Quitar rol\n"
-            f"`{p}cr #color <nombre>` `{p}er <nombre>` `{p}lroles`\n"
-            f"`{p}ru [@u]` `{p}ann [#c] <msg>` `{p}emb [#c] \"titulo\" <msg>`\n"
-            f"`{p}v @u` — Dar acceso /arn"
-        ), inline=False)
-    embed.add_field(name="🎰 Juegos",
+            f"`{p}ru [@u]` — Listar roles del user\n"
+            f"`{p}v @u` — Dar acceso ARN"
+        ), inline=True)
+    e.add_field(name="Gestión",
         value=(
-            f"`{p}trivia` `{p}adivina [max]` `{p}acertijo`\n"
+            f"`{p}cr #color <nombre>` — Crear rol\n"
+            f"`{p}er <nombre>` — Eliminar rol\n"
+            f"`{p}lroles` — Listar roles"
+        ), inline=True)
+    e.add_field(name="Anuncios",
+        value=(
+            f"`{p}ann [#c] <msg>` — Anuncio\n"
+            f"`{p}emb [#c] \"titulo\" <msg>` — Embed"
+        ), inline=False)
+    pages.append(e)
+
+    # ─── Página 8: Juegos ────────────────────────────────────
+    e = discord.Embed(title="🎰 Comandos de Juegos", color=RED)
+    e.add_field(name="Entretenimiento",
+        value=(
+            f"`{p}trivia` — Pregunta trivia\n"
+            f"`{p}adivina [max]` — Adivina el número\n"
+            f"`{p}acertijo` — Acertijo aleatorio\n"
             f"`{p}tor [@u]` — Verdad o Reto\n"
-            f"`{p}dado [lados]` `{p}dp [n] [lados]` `{p}moneda`\n"
-            f"`{p}ruleta op1 op2...` `{p}8ball <preg>` `{p}piedra`"
-        ), inline=False)
-    embed.add_field(name="🎁 Sorteos y Encuestas (Staff)",
-        value=f"`{p}sorteo <seg> <premio>` `{p}encuesta <preg> | op1 | op2` `{p}encuesta_si_no <preg>`",
-        inline=False)
-    embed.add_field(name="🎭 Roleplay",
+            f"`{p}8ball <preg>` — Bola 8 mágica\n"
+            f"`{p}piedra` — Piedra Papel Tijera"
+        ), inline=True)
+    e.add_field(name="Azar",
         value=(
-            f"`{p}casar @u` `{p}aceptar` `{p}rechazar` `{p}divorcio` `{p}pareja`\n"
-            f"`{p}adoptar @u` `{p}familia`"
-        ), inline=False)
-    embed.add_field(name="🔮 Fun",
+            f"`{p}dado [lados]` — Tirar dado\n"
+            f"`{p}dp [n] [lados]` — Dados personalizados\n"
+            f"`{p}moneda` — Cara o cruz\n"
+            f"`{p}ruleta op1 op2...` — Ruleta"
+        ), inline=True)
+    pages.append(e)
+
+    # ─── Página 9: Sorteos y Encuestas ───────────────────────
+    e = discord.Embed(title="🎁 Sorteos y Encuestas", color=RED,
+        description="*Requieren rol de Staff*")
+    e.add_field(name="Sorteos",
+        value=f"`{p}sorteo <segundos> <premio>` — Iniciar sorteo", inline=False)
+    e.add_field(name="Encuestas",
         value=(
-            f"`{p}horoscopo <signo>` `{p}personalidad` `{p}compatibilidad @u`\n"
-            f"`{p}fp [personaje]` `{p}pl` — Frases anime\n"
-            f"`{p}frase` `{p}chiste` `{p}meme`"
+            f"`{p}encuesta <preg> | op1 | op2` — Encuesta\n"
+            f"`{p}encuesta_si_no <pregunta>` — Sí / No"
         ), inline=False)
-    embed.add_field(name="🐱 Anime",
-        value=f"`{p}abrazar` `{p}pat` `{p}slap` `{p}kiss` `{p}poke` `{p}cuddle` `{p}bite` `{p}wave` `{p}dance` `{p}cry`",
-        inline=False)
-    embed.add_field(name="🎂 Cumpleaños y ⏰ Recordatorios",
+    pages.append(e)
+
+    # ─── Página 10: Roleplay ─────────────────────────────────
+    e = discord.Embed(title="🎭 Roleplay", color=RED)
+    e.add_field(name="Parejas",
         value=(
-            f"`{p}cumple [DD/MM]` `{p}cumple_ver [@u]` `{p}cumples_lista`\n"
-            f"`{p}recordar <10m/2h/30s> <msg>`"
+            f"`{p}casar @u` — Proponer matrimonio\n"
+            f"`{p}aceptar` — Aceptar propuesta\n"
+            f"`{p}rechazar` — Rechazar propuesta\n"
+            f"`{p}divorcio` — Divorciarse\n"
+            f"`{p}pareja` — Ver tu pareja"
+        ), inline=True)
+    e.add_field(name="Familia",
+        value=(
+            f"`{p}adoptar @u` — Adoptar\n"
+            f"`{p}familia` — Ver tu familia"
+        ), inline=True)
+    pages.append(e)
+
+    # ─── Página 11: Fun ──────────────────────────────────────
+    e = discord.Embed(title="🔮 Comandos Fun", color=RED)
+    e.add_field(name="Personalidad",
+        value=(
+            f"`{p}horoscopo <signo>` — Horóscopo\n"
+            f"`{p}personalidad` — Test de personalidad\n"
+            f"`{p}compatibilidad @u` — Compatibilidad"
+        ), inline=True)
+    e.add_field(name="Entretenimiento",
+        value=(
+            f"`{p}frase` — Frase motivacional\n"
+            f"`{p}chiste` — Chiste aleatorio\n"
+            f"`{p}meme` — Meme random\n"
+            f"`{p}fp [personaje]` — Frase de personaje\n"
+            f"`{p}pl` — Frases de anime"
+        ), inline=True)
+    pages.append(e)
+
+    # ─── Página 12: Anime ────────────────────────────────────
+    e = discord.Embed(title="🐱 Comandos Anime", color=RED,
+        description="Interactúa con otros usuarios con GIFs de anime")
+    e.add_field(name="Comandos",
+        value=(
+            f"`{p}abrazar @u` · `{p}pat @u` · `{p}slap @u`\n"
+            f"`{p}kiss @u` · `{p}poke @u` · `{p}cuddle @u`\n"
+            f"`{p}bite @u` · `{p}wave @u` · `{p}dance`\n"
+            f"`{p}cry`"
         ), inline=False)
-    embed.add_field(name="⚙️ Config",
-        value=f"`{p}setprefix <nuevo>` — Cambiar prefijo",
+    pages.append(e)
+
+    # ─── Página 13: Cumpleaños y Recordatorios ───────────────
+    e = discord.Embed(title="🎂 Cumpleaños y ⏰ Recordatorios", color=RED)
+    e.add_field(name="Cumpleaños",
+        value=(
+            f"`{p}cumple [DD/MM]` — Registrar cumpleaños\n"
+            f"`{p}cumple_ver [@u]` — Ver cumpleaños\n"
+            f"`{p}cumples_lista` — Lista del servidor"
+        ), inline=False)
+    e.add_field(name="Recordatorios",
+        value=f"`{p}recordar <10m/2h/30s> <msg>` — Crear recordatorio",
         inline=False)
+    pages.append(e)
+
+    # ─── Página 14: Config ───────────────────────────────────
+    e = discord.Embed(title="⚙️ Configuración", color=RED)
+    e.add_field(name="Bot",
+        value=f"`{p}setprefix <nuevo>` — Cambiar prefijo del servidor",
+        inline=False)
+    pages.append(e)
+
+    # Añadir numeración de página a todos los embeds
+    total = len(pages)
+    for i, page in enumerate(pages):
+        page.set_footer(text=f"📖 Página {i+1}/{total} • Usa los botones para navegar")
+
+    return pages
+
+
+# ── Vista de paginación con botones y dropdown ────────────────
+class AyudaView(discord.ui.View):
+    """Vista interactiva de ayuda paginada al estilo ZyroX."""
+
+    CATEGORIES = {
+        "main": [
+            ("🌐 Generales",        1),
+            ("🛡️ AntiNuke",         2),
+            ("🔒 Moderación",       3),
+            ("⚠️ Warns",            4),
+            ("💬 Canales",          5),
+            ("🎭 Roles",            6),
+        ],
+        "extra": [
+            ("🎰 Juegos",           7),
+            ("🎁 Sorteos",          8),
+            ("🎭 Roleplay",         9),
+            ("🔮 Fun",             10),
+            ("🐱 Anime",           11),
+            ("🎂 Cumpleaños",      12),
+            ("⚙️ Config",          13),
+        ],
+    }
+
+    def __init__(self, pages: list, author_id: int):
+        super().__init__(timeout=120)
+        self.pages    = pages
+        self.current  = 0
+        self.author   = author_id
+        self._build_select()
+
+    # ── Dropdown ──────────────────────────────────────────────
+    def _build_select(self):
+        # Dropdown Comandos Principales
+        main_select = discord.ui.Select(
+            placeholder="📋 Comandos Principales",
+            min_values=1, max_values=1, row=1,
+            options=[
+                discord.SelectOption(label=name, value=str(idx), emoji="🔴")
+                for name, idx in self.CATEGORIES["main"]
+            ]
+        )
+        main_select.callback = self._select_callback
+        self.add_item(main_select)
+
+        # Dropdown Comandos Extra
+        extra_select = discord.ui.Select(
+            placeholder="🎮 Comandos Extra",
+            min_values=1, max_values=1, row=2,
+            options=[
+                discord.SelectOption(label=name, value=str(idx), emoji="🎯")
+                for name, idx in self.CATEGORIES["extra"]
+            ]
+        )
+        extra_select.callback = self._select_callback
+        self.add_item(extra_select)
+
+    async def _select_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message(
+                "❌ Solo el que invocó el comando puede usar esto.", ephemeral=True)
+        self.current = int(interaction.data["values"][0])
+        await interaction.response.edit_message(
+            embed=self.pages[self.current], view=self)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return True  # dejamos pasar; cada botón valida por dentro
+
+    # ── Botones ───────────────────────────────────────────────
+    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.grey, row=0)
+    async def first(self, interaction: discord.Interaction, _):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message("❌ No es tu menú.", ephemeral=True)
+        self.current = 0
+        await interaction.response.edit_message(embed=self.pages[0], view=self)
+
+    @discord.ui.button(emoji="◀️", style=discord.ButtonStyle.blurple, row=0)
+    async def prev(self, interaction: discord.Interaction, _):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message("❌ No es tu menú.", ephemeral=True)
+        self.current = (self.current - 1) % len(self.pages)
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    @discord.ui.button(emoji="🗑️", style=discord.ButtonStyle.danger, row=0)
+    async def delete(self, interaction: discord.Interaction, _):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message("❌ No es tu menú.", ephemeral=True)
+        await interaction.message.delete()
+
+    @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.blurple, row=0)
+    async def next(self, interaction: discord.Interaction, _):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message("❌ No es tu menú.", ephemeral=True)
+        self.current = (self.current + 1) % len(self.pages)
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.grey, row=0)
+    async def last(self, interaction: discord.Interaction, _):
+        if interaction.user.id != self.author:
+            return await interaction.response.send_message("❌ No es tu menú.", ephemeral=True)
+        self.current = len(self.pages) - 1
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+
+# ── Comando !ayuda con interfaz paginada ─────────────────────
+@bot.command(name="ayuda", aliases=["help","h","comandos"])
+async def ayuda(ctx):
+    pages = _get_help_pages(PREFIX)
+    view  = AyudaView(pages, ctx.author.id)
+    await ctx.send(embed=pages[0], view=view)
+
+@bot.tree.command(name="ayuda", description="📖 Muestra todos los comandos del bot")
+async def ayuda_slash(interaction: discord.Interaction):
+    pages = _get_help_pages(PREFIX)
+    view  = AyudaView(pages, interaction.user.id)
+    await interaction.response.send_message(embed=pages[0], view=view)
+
+
+# ── Comando !userinfo estilo ZyroX ────────────────────────────
+@bot.command(name="userinfo", aliases=["ui","whois","info"])
+async def userinfo(ctx, member: discord.Member = None):
+    member = member or ctx.author
+
+    # ── Roles (sin @everyone) ─────────────────────────────────
+    roles = [r for r in reversed(member.roles) if r != ctx.guild.default_role]
+    highest_role = roles[0] if roles else None
+    roles_mention = " ".join(r.mention for r in roles[:10]) or "Sin roles"
+    if len(roles) > 10:
+        roles_mention += f" *+{len(roles)-10} más*"
+
+    # ── Insignias ─────────────────────────────────────────────
+    badges = []
+    flags = member.public_flags
+    if flags.hypesquad_bravery:    badges.append("HypeSquad Bravery")
+    if flags.hypesquad_brilliance: badges.append("HypeSquad Brilliance")
+    if flags.hypesquad_balance:    badges.append("HypeSquad Balance")
+    if flags.early_supporter:      badges.append("Early Supporter")
+    if flags.bug_hunter:           badges.append("Bug Hunter")
+    if flags.bug_hunter_level_2:   badges.append("Bug Hunter Gold")
+    if flags.verified_bot_developer: badges.append("Bot Developer")
+    if flags.partner:              badges.append("Discord Partner")
+    if flags.staff:                badges.append("Discord Staff")
+    badges_str = " · ".join(badges) if badges else "Ninguna"
+
+    # ── Permisos clave ────────────────────────────────────────
+    PERMS_CLAVE = {
+        "administrator":       "Administrator",
+        "ban_members":         "Ban Members",
+        "kick_members":        "Kick Members",
+        "manage_guild":        "Manage Server",
+        "manage_messages":     "Manage Messages",
+        "manage_roles":        "Manage Roles",
+        "manage_channels":     "Manage Channels",
+        "manage_nicknames":    "Manage Nicknames",
+        "manage_webhooks":     "Manage Webhooks",
+        "manage_emojis":       "Manage Emojis",
+        "mention_everyone":    "Mention Everyone",
+        "moderate_members":    "Moderate Members",
+    }
+    perms = member.guild_permissions
+    active_perms = [label for attr, label in PERMS_CLAVE.items() if getattr(perms, attr, False)]
+    perms_str = " , ".join(active_perms) if active_perms else "Ninguno"
+
+    # ── Reconocimiento ────────────────────────────────────────
+    if member.id == ctx.guild.owner_id:
+        ack = "Server Owner"
+    elif perms.administrator:
+        ack = "Server Admin"
+    elif perms.manage_guild:
+        ack = "Server Manager"
+    elif perms.manage_messages:
+        ack = "Server Moderator"
+    else:
+        ack = "Server Member"
+
+    # ── Voz y Boost ───────────────────────────────────────────
+    voz      = member.voice.channel.mention if member.voice else "None"
+    boosting = f"Since {member.premium_since.strftime('%d/%m/%Y')}" if member.premium_since else "None"
+
+    # ── Fechas ────────────────────────────────────────────────
+    acc_created  = member.created_at.strftime("%d/%m/%Y")
+    guild_joined = member.joined_at.strftime("%d/%m/%Y") if member.joined_at else "?"
+
+    # ── Construir embed ───────────────────────────────────────
+    embed = discord.Embed(
+        title=f"{member}'s Information",
+        color=highest_role.color if highest_role and highest_role.color.value else 0xFF0000
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+
+    embed.add_field(name="__General Information__",
+        value=(
+            f"**Name:** {member.name}\n"
+            f"**ID:** {member.id}\n"
+            f"**Nickname:** {member.nick or 'None'}\n"
+            f"**Bot?:** {'✅ Yes' if member.bot else '❌ No'}\n"
+            f"**Badges:** {badges_str}\n"
+            f"**Account Created:** {acc_created}\n"
+            f"**Server Joined:** {guild_joined}"
+        ), inline=False)
+
+    embed.add_field(name="__Role Info__",
+        value=(
+            f"**Highest Role:** {highest_role.mention if highest_role else 'None'}\n"
+            f"**Roles ({len(roles)}):** {roles_mention}\n"
+            f"**Color:** `{str(member.color)}`"
+        ), inline=False)
+
+    embed.add_field(name="__Extra__",
+        value=(
+            f"**Boosting:** {boosting}\n"
+            f"**Voice:** {voz}"
+        ), inline=False)
+
+    embed.add_field(name="__Key Permissions__",
+        value=perms_str, inline=False)
+
+    embed.add_field(name="__Acknowledgement__",
+        value=ack, inline=False)
+
+    now = datetime.now(timezone.utc).strftime("%I:%M %p")
+    embed.set_footer(
+        text=f"Requested by {ctx.author} • Today at {now}",
+        icon_url=ctx.author.display_avatar.url
+    )
+
     await ctx.send(embed=embed)
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2704,10 +3167,24 @@ async def ayuda(ctx):
 
 @bot.event
 async def on_ready():
-    log.info(f"Bot conectado: {bot.user} (ID: {bot.user.id})")
+    # ── Sincronizar slash commands ──────────────────────────
+    try:
+        synced = await bot.tree.sync()
+        log.info(f"Slash commands sincronizados: {len(synced)}")
+    except Exception as e:
+        log.error(f"Error al sincronizar slash commands: {e}")
+
+    # ── Presencia ───────────────────────────────────────────
     await bot.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.watching, name=f"{PREFIX}ayuda | AntiNuke")
+        activity=discord.Activity(
+            type=discord.ActivityType.watching,
+            name=f"!ayuda | /ayuda | AntiNuke"
+        )
     )
+
+    # ── Banner rojo en consola ──────────────────────────────
+    mostrar_banner(bot_user=bot.user, guild_count=len(bot.guilds))
+    log.info(f"Bot listo: {bot.user} (ID: {bot.user.id})")
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -2730,6 +3207,11 @@ async def on_command_error(ctx, error):
 #  INICIO
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    print(f"\n{R}{'═'*64}{RS}")
+    print(f"  {BW}Exagon Bot — Iniciando...{RS}")
+    print(f"  {GR}Prefix activo:{RS} {BR}!{RS}  {GR}+{RS}  {BR}/{RS}")
+    print(f"{R}{'═'*64}{RS}\n")
+
     while True:
         try:
             log.info("Iniciando bot...")
@@ -2744,3 +3226,4 @@ if __name__ == "__main__":
             log.error(f"Error:\n{traceback.format_exc()}")
             log.info("Reiniciando en 5s...")
             time.sleep(5)
+
